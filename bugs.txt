@@ -1,0 +1,103 @@
+10/16/21 9:30am (sahasrm2)
+When compiling, boot.S is not able to find the symbol gdt_desc_ptr from x86_desc.h even though it
+is externally defined in x86_desc.S
+The solution was to place gdt_desc_ptr in the right location, making sure to have
+a .align 4 directive. Also, I had to convert debug.sh to linux. Combination of these
+two solved my problem.
+
+10/16/21 (deepakn3)
+IDT is not being initialised properly, which causes a boot loop to occur as I manually call the int signal or purposefully do a divide by 0 error.
+The solution was discovered as the TA pointed me to the appropriate intel documentation that allowed to set the seg selector to the appropriate value.
+
+10/18/21 (deepakn3)
+Writing up the code for paging and then testing led to bootloops as well , we were manually setting some values into our paging directory and these 
+turned out to be formatted wrong. After reading the documentaion as well as referncing existing tables in the code base we were able to alter the bit value to limit our to the cr0 register not being accesible
+
+10/18/21 6:00pm
+Paging keeps going in a boot loop.
+We decided to restructure the code and use structs instead of manually bit shifting and crying. After that,
+it was a bunch of trial and error to see what is going wrong with values that we were setting. We forgot to
+set page size bit for kernel, so cr0 couldn't be loaded. Also, there was a strange point where the display
+would flash on then immediately crash. This was because the Directory Table was not static and was destroyed
+at the end of the init function.
+
+10/18/21 8:00pm
+Paging is opening too many pages. There are too many blocks of memory that are opened for r or r/w. 
+Turns out the issue was that I was not being considerate of the different format for 4MB entries
+and 4KB entries. I had to create a mediator struct that works for the both the page directory and page
+table. Another issue was that I was trying to fit a 12 bit address into a 10 bit space. The top bits
+were cut off and the Page Table was pointing to a random memory location. This explained the randomly
+opened pages.
+
+10/18/21 8:00pm
+Keyboard and rtc intr is broken after whatever the first intr is triggered. it appears that the system
+is frozen and prohibit further printing. This bug is triggered by multi issue in the i8259.c file. 
+The first issue lies in the wrongly calling of clisave which cause conflicts when triggered. 
+The second issue lies in the function sene_eoi, which should send the result of irqnum OR EOI signal
+however in our implementation only the eoi message is sent back in the message port of pic.
+
+10/24/21 8:00am
+printing files has random newlines that appear.
+This was an error with the terminal driver, that was fixed by handling new lines correctly. This error
+was found using gdb and standard debug tactics.
+
+
+10/24/21 10:00am
+Page Faulting when hitting enter and going to the bottom of the screen, backspace going to the top row even when numchars is equal to. Small issues with the driver no matching up with the required implementatio
+Two new lines printed for terminal read and write, Enter not being put into the terminal buffer. Numchar is implemented at putc so when i looping based on numchars while putcing chars, and infinite loop and garbage memory is put into video mem.
+All of these errors described had to be fixed using a combination of gdb and rereading the semantics of the code
+
+10/25/21 9:00pm
+rtc cannot switch freqency. this bug is triggered by rtc.c file, the freqency switcher use a switch case but forget to add break; after conditions, so freqency always remains defalt value. 
+
+10/26/21 12:00pm
+When printing file names to the screen, a smiley face will show up when printing the filename of the long file.
+To fix this, I looped and putc'd every character of the filename individually. This worked first try.
+
+11/8/21 8pm
+page fault error when accessing rtc.
+solved by finding that the if condition is wrong . changed it to strcmp and correctly give the right address to the struct.
+
+11/8/21 11:00pm
+cannot access file_open()
+solve by finding that the pcb array is uninitiallized, fix by setting it to unused
+
+11/9/21 1pm
+ton of warnings in compiler.
+solved by unified all the argument type and pointer type to the same.
+
+11/9/21 3pm
+shell is not launching.
+solved by change the data type from uint_32 to int, thus support the -1 conditions.
+
+11/9/21 4pm
+ls is not working
+solved by finding that the return value is wrong. changed it to correct value and fixed it.
+
+12/3/21 4pm
+cannot switch terminal
+solved by giving a sperate struct to store the individual information for each shell.
+
+12/3/21 6pm
+switch shell working , switch program not work
+solved by adding context switch code to switch process, previous program only load registers.
+
+12/4/21 11am
+switch program give a pagefault error
+solved by assigning the correct page memory when context switch, previous assignment is too large
+
+12/4/21 2pm
+the argument is entered in wrong shells
+solved by making context switch to the foreground shell when the background shell is runing .
+
+12/5/21 10am
+fish not working.
+solved by adding switching command in vidmap to select the correct VEDIO MEM address to write.
+
+12/5/21 11am
+hello cannot take too long argument.
+solved by adding cliping code cliped the argument after 128bytes
+
+12/5/21 12pm
+cat and grep not working.
+solved the overflow issue by expanding the charbuff from 128byte to 1024byte,.
